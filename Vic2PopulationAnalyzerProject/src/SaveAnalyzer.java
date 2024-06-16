@@ -28,7 +28,7 @@ public class SaveAnalyzer {
         System.out.println();
         System.out.println("Type \"end\" to exit");
         // String input = console.nextLine();
-        String input = "/Users/hughgramelspacher/Downloads/saves/mp_North_German Federation1854_12_24.v2";
+        String input = "/Users/hughgramelspacher/Downloads/Victorian legacy 11-05-24 - X";
         if (input.equals("end")) {
             System.exit(0);
         }
@@ -93,11 +93,9 @@ public class SaveAnalyzer {
             num--;
             if (!eachFile.getName().endsWith(".DS_Store")) {
                 SaveGame save = new SaveGame(eachFile);
-                System.out.println(eachFile.getPath());
                 Long currTime = System.currentTimeMillis();
                 save.scanFile();
                 Long currTimeTwo = System.currentTimeMillis();
-                System.out.println("Time taken to scan file: " + (currTimeTwo - currTime));
                 Map<String, Country> allCountries = save.getCountryMap();
                 Set<String> keySet = allCountries.keySet();
                 allTotalTags.addAll(keySet);
@@ -158,7 +156,7 @@ public class SaveAnalyzer {
             for (String tag : tagSet) {
                 hasValues = false;
                 for (SaveGame save : saves) {
-                    if (save.getCountryMap().get(tag).getPopSize() != 0) {
+                    if (save.getCountryMap().get(tag) != null && save.getCountryMap().get(tag).getPopSize() != 0) {
                         hasValues = true;
                     }
                 }
@@ -170,9 +168,17 @@ public class SaveAnalyzer {
                             tagPlaced = true;
                         }
                         if (isAccepted) {
-                            writer.append(String.valueOf(save.getCountryMap().get(tag).getAcceptedPopTotal()));
+                            if (save.getCountryMap().get(tag) != null) {
+                                writer.append(String.valueOf(save.getCountryMap().get(tag).getAcceptedPopTotal()));
+                            } else {
+                                writer.append("0");
+                            }
                         } else {
-                            writer.append(String.valueOf(save.getCountryMap().get(tag).getPopSize()));
+                            if (save.getCountryMap().get(tag) != null) {
+                                writer.append(String.valueOf(save.getCountryMap().get(tag).getPopSize()));
+                            } else {
+                                writer.append("0");
+                            }
                         }
                         writer.append(',');
                         tagHasPops = true;

@@ -1,14 +1,7 @@
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.nio.file.Files;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
+import java.util.*;
+import java.util.regex.*;
 
 /**
  * This class represents a Victoria 2 save that contains data regarding it's
@@ -39,11 +32,10 @@ import java.util.TreeSet;
 
     @SuppressWarnings("unchecked")
     public void scanFile() throws IOException {
-        BufferedReader scanner = new BufferedReader(new InputStreamReader(Files.newInputStream(save.toPath())));
+        BufferedReader scanner;
         String line, currType, currCulture, currReligion, currProvName, 
                 currProvController, currProvOwner, currCountry;
-        String[] splitLine;
-        String[] splitLineTwo;
+        String[] splitLine, splitLineTwo;
         boolean inPopType, inProvince, inCountry, currCountryHasPops, 
                 currIsHuman, isGettingCulture, gettingStateProvinces;
         int id, lastSizeRecorded, bracketCount, currProvID, count, currSize;
@@ -51,44 +43,56 @@ import java.util.TreeSet;
         Set<String> currAcceptedSet;
         Set<State> statesSet;
         Set<Province> provSet;
+
+        scanner = new BufferedReader(new InputStreamReader(Files.newInputStream(save.toPath())));
         currAcceptedSet  = new HashSet<>();
         statesSet = new HashSet<>();
         provSet = new HashSet<>();
-        
         splitLine = new String[2];
-
         inPopType = false;
         inCountry = false;
         inProvince = false;
         isGettingCulture = false;
         currIsHuman = false;
         gettingStateProvinces = false;
-
         currCulture = "";
         currReligion = "";
         currSize = 0;
         currType = "";
-
         currProvName = "";
         currProvController = "";
         currProvOwner = "";
         currProvID = 0;
-
         currCountry = "";
         line = "";
         count = 500;
         bracketCount = 0;
         taxBase = 0;
 
-        // keeps track of brackets
-        
+        // here put all regex patterns
 
-        Long currTime = System.currentTimeMillis();
+        // Pattern 
+        Pattern provDigitsPattern = Pattern.compile("^\\d+=$");
+        Pattern tagPattern = Pattern.compile("^[A-Z]{3}=$");
+        Pattern culturePattern = Pattern.compile("^\t\t([a-z_]+)=([a-z_]+)$");
+        Pattern typePattern = Pattern.compile("^\t([a-z]+)=$");
+
+        int num = 0;
+        Long tot1 = 0L;
+        Long tot2 = 0L;
+        Long tot3 = 0L;
+
+        Long currTime = System.nanoTime();
         while ((line = scanner.readLine()) != null) {
+            boolean startsWithTab = line.startsWith("\t");
+            boolean containsEqual = line.contains("=");
+            num++;
+            
+            
+            Long time2 = System.nanoTime();
             if (line.contains("{")) {
                 bracketCount++;
-            }
-            // if there's an ending bracket, reduce bracket count
+            } 
             if (line.contains("}")) {
                 bracketCount--;
             }
@@ -96,26 +100,20 @@ import java.util.TreeSet;
             if (inProvince) {
                 // pre: We have a province id, and an object associated with
                 // that province id
-                if (line.contains("name=\"")) {
+
+                if (startsWithTab && containsEqual && line.startsWith("\tname=\"")) {
                     // sets the name of the province
                     currProvName = extractName(line.trim(), 6, true);
-                }
-
-                if (line.contains("owner=\"")) {
+                } else if (startsWithTab && containsEqual && line.startsWith("\towner=\"")) {
                     // sets the name of the province
                     currProvOwner = extractName(line.trim(), 7, true);
-                }
-
-                if (line.contains("controller")) {
+                } else if (startsWithTab && containsEqual && line.startsWith("\tcontroller=")) {
                     // sets the name of the province
                     currProvController = extractName(line.trim(), 12, true);
-                }              
-                
-                if (line.matches("^\t([a-z]+)=$") && !line.contains("rgo")) {
+                } else if (!line.isEmpty() && line.charAt(line.length() - 1) == '=' && startsWithTab && !line.startsWith("rgo") && matches(typePattern, line)) {
                     inPopType = true;
                     currType = line.trim().substring(0, line.length() - 2);
-                    
-                } else if (bracketCount == 1 && inPopType) {
+                } else if (inPopType && bracketCount == 1 ) {
                     // here currID is always valid
                     inPopType = false;
                     //  now, if we have a valid province, create it, but only if
@@ -136,13 +134,13 @@ import java.util.TreeSet;
                 }
                 // now currPop type is functioning
                 if (inPopType) {
-                    if (line.contains("size=")) {
+                    if (startsWithTab && containsEqual && line.startsWith("\t\tsize=")) {
                         // this sets the current pop size of the popType to the
                         // value on size.
                         currSize = Integer.parseInt(extractName(line.trim(), 5, false));
                     }
 
-                    if (line.matches("^\t\t([a-z_]+)=([a-z_]+)$")) {
+                    if (!line.isEmpty() && startsWithTab && containsEqual && line.startsWith("\t\t") && matches(culturePattern, line)) {
                         line = line.trim();
                         splitLine = line.split("=");
                         // now it's anglo[0], protestant[1];
@@ -151,20 +149,22 @@ import java.util.TreeSet;
                     }
                 }
             }
-
-            if (!dateSet && line.startsWith("date=\"")) {
+            tot1 += (System.nanoTime() - time2);
+            Long time3 = System.nanoTime();
+            if (!dateSet) {
                 setDates((extractName(line, 6, true)));
                 dateSet = true;
             }
             
-            if (line.matches("^\\d+=$")) {
+            if (!line.isEmpty() && !startsWithTab && line.charAt(line.length() - 1) == '=' 
+                    && matches(provDigitsPattern, line)) {
                 // this means that every time we have 
                 inProvince = true;
                 id = Integer.parseInt(line.substring(0, line.length() - 1));
                 currProvID = id;
                 // now if bracketCount goes down to 0, we want to reset stuff
                 // and change curr prov
-            } else if (bracketCount == 0 && inProvince) {
+            } else if (inProvince && bracketCount == 0) {
                 inProvince = false;
                 currProvController = "";
                 currProvName = "";
@@ -174,8 +174,7 @@ import java.util.TreeSet;
                 // expression, and the bracket count is 0, we are NOT in a province
             }
 
-            // now we test for accepted
-            if (line.matches("^[A-Z]{3}=$")) {
+            if (matches(tagPattern, line)) {
                 // this means that there's a country to scan
                 currCountry = line.substring(0, 3);
                 inCountry = true;
@@ -188,7 +187,6 @@ import java.util.TreeSet;
                     if (currIsHuman) {
                         humanSet.add(currCountry);
                     }
-                    // System.out.println("CurrCountry: " + currCountry + ", isHuman: " + currIsHuman + ", accepted: " + currAcceptedSet + ", size: " + country.getPopSize());
                 }
                 // before we do all this, create country and add it to country map
                 inCountry = false;
@@ -206,42 +204,39 @@ import java.util.TreeSet;
                 // don't need to do anything for set because it resets every time
                 isGettingCulture = false;
             }
+            tot2 += (System.nanoTime() - time3);
+
+
+            Long time4 = System.nanoTime();
+
 
             if (inCountry) {
                 // this means we know currCountry
-                if (line.contains("human=")) {
+                
+                if (line.startsWith("\thuman=")) {
                     currIsHuman = true;
-                }
-                if (line.contains("tax_base=")) {
+                } else if (line.startsWith("\ttax_base=")) {
                     taxBase = Double.parseDouble(extractName(line.trim(), 9, false));
                     currCountryHasPops = taxBase > 0;
-                }
-
-                if (line.contains("primary_culture=")) {
+                } else if (line.startsWith("\tprimary_culture=")) {
                     currAcceptedSet = new HashSet<>();
                     currAcceptedSet.add(extractName(line.trim(), 17, true));
-                }
-
-                if (line.trim().startsWith("culture=")) {
+                } else if (line.startsWith("\tculture=")) {
                     isGettingCulture = true;
                 } else if (bracketCount == 1 && isGettingCulture) {
                     isGettingCulture = false;
-                    System.out.println(currCountry + ": " + currAcceptedSet);
                     // now not getting culture, but continue in inCountry
-                }
+                } 
+
                 
-                if (isGettingCulture) {
-                    if (line.startsWith("\"")){
-                        String culture = extractName(line, 1, true);
-                        currAcceptedSet.add(culture);
-                        // adds cultures if getting culture
-                    }
+                if (isGettingCulture && line.charAt(0) == '"') {
+                    String culture = extractName(line, 1, true);
+                    currAcceptedSet.add(culture);
                 }
                 // can do anything else in country
                 // now wait for states
-                if (line.matches("^\t\tprovinces=$")) {
+                if (line.startsWith("\t\tprovinces=")) {
                     gettingStateProvinces = true;
-                    // System.out.println("gettinstate brack " + bracketCount);
                 } else if (bracketCount == 2 && gettingStateProvinces) {
                     // then stop getting bracket count. 
                     // here it also contains all provIDs
@@ -261,15 +256,13 @@ import java.util.TreeSet;
                 }
 
             }
-
             // now in province functions correctly, so if in province, we can do
             // stuff!
-
-            if (line.matches("^[A-Z][0-9][0-9]=$")) {
-                break;
-            }
+            tot3 += (System.nanoTime() - time4);
         }
-        System.out.println("Time for whole scan: " + (System.currentTimeMillis() - currTime));
+        // System.out.println("tot1: " + (tot1) / num);
+        // System.out.println("tot2: " + (tot2) / num);
+        // System.out.println("tot3: " + (tot3) / num);
         scanner.close();
     }
 
@@ -313,6 +306,13 @@ import java.util.TreeSet;
             bracketCount--;
         }
     }
+
+    private static boolean matches(Pattern pattern, String input) {
+        // Reuse the compiled pattern to create a matcher
+        Matcher matcher = pattern.matcher(input);
+        return matcher.matches();
+    }
+
 
      // Getter for countryMap
     public Map<String, Country> getCountryMap() {

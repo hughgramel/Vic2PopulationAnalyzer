@@ -11,10 +11,13 @@ public class Client {
         
 //        System.out.println("This program analyzes the save data of either a folder of Victoria 2 save files");
 //        System.out.println("or an individual save, and outputs 2 CSV files: 1 full of the accepted pop counts, and");
-//        System.out.println("one full of the total pop counts for a certain amount of countries in each save");
+//        System.out.println("one full of the total pop counts for a certain
+//        amount of countries in each save");
+        Long time = System.currentTimeMillis();
         SaveAnalyzer saveAnalyzer = new SaveAnalyzer();
         saveAnalyzer.getFiles();
         saveAnalyzer.readFiles();
+        System.out.println("Total Time: " + (System.currentTimeMillis() - time));
         System.out.println("Setting specific countries...");
         saveAnalyzer.setInputtingSpecificCountries();
         System.out.println("Printing files...");
